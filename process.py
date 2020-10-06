@@ -13,6 +13,8 @@ __all__ = ['Pool', 'ThreadPool']
 # Imports
 #
 
+import signal
+import atexit
 import collections
 import itertools
 import os
@@ -95,6 +97,10 @@ class MaybeEncodingError(Exception):
 
 def worker(inqueue, outqueue, stop_pipe, initializer=None, initargs=(), maxtasks=None,
            wrap_exception=False):
+    def run_exitfuncs(num, frame):
+        atexit._run_exitfuncs()
+    signal.signal(signal.SIGTERM, run_exitfuncs)
+
     if (maxtasks is not None) and not (isinstance(maxtasks, int)
                                        and maxtasks >= 1):
         raise AssertionError("Maxtasks {!r} is not valid".format(maxtasks))
@@ -140,6 +146,7 @@ def worker(inqueue, outqueue, stop_pipe, initializer=None, initargs=(), maxtasks
         task = job = result = func = args = kwds = None
         completed += 1
     util.debug('worker exiting after %d tasks' % completed)
+    atexit._run_exitfuncs()
 
 def _helper_reraises_exception(ex):
     'Pickle-able helper function for use by _guarded_task_generation.'
