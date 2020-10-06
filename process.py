@@ -29,6 +29,7 @@ from queue import Empty
 # we avoid top-level imports which are liable to fail on some systems.
 from multiprocessing import util, get_context, TimeoutError
 from multiprocessing.connection import wait
+from multiprocessing.managers import BaseManager
 
 #
 # Constants representing the state of a pool
@@ -196,9 +197,16 @@ class Pool(object):
         self._pool = []
         self._state = INIT
 
+        class LifoQueueManager(BaseManager):
+            pass
+
+        LifoQueueManager.register('LifoQueue', queue.LifoQueue)
+        self._manager = LifoQueueManager()
+        self._manager.start()
+
         self._ctx = context or get_context()
         self._setup_queues()
-        self._taskqueue = queue.SimpleQueue()
+        self._taskqueue = queue.LifoQueue()
         # The _change_notifier queue exist to wake up self._handle_workers()
         # when the cache (self._cache) is empty or when there is a change in
         # the _state variable of the thread that runs _handle_workers.
@@ -368,9 +376,9 @@ class Pool(object):
                                          wrap_exception)
 
     def _setup_queues(self):
-        self._inqueue = self._ctx.SimpleQueue()
+        self._inqueue = self._manager.LifoQueue()
         self._outqueue = self._ctx.SimpleQueue()
-        self._quick_put = self._inqueue._writer.send
+        self._quick_put = self._inqueue.put
         self._quick_get = self._outqueue._reader.recv
 
     def _check_running(self):
@@ -573,10 +581,10 @@ class Pool(object):
     def _help_stuff_finish(inqueue, task_handler, size):
         # task_handler may be blocked trying to put items on inqueue
         util.debug('removing tasks from inqueue until task handler finished')
-        inqueue._rlock.acquire()
-        while task_handler.is_alive() and inqueue._reader.poll():
-            inqueue._reader.recv()
-            time.sleep(0)
+        # inqueue._rlock.acquire()
+        # while task_handler.is_alive() and inqueue._reader.poll():
+        #     inqueue._reader.recv()
+        #     time.sleep(0)
 
     @classmethod
     def _terminate_pool(cls, taskqueue, inqueue, outqueue, pool, change_notifier,
