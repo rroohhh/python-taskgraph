@@ -2,7 +2,6 @@ import functools
 import asyncio
 import inspect
 from asyncio import Future
-import multiprocess
 from threading import Thread
 from process import Pool
 from functools import partial
